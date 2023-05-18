@@ -1,0 +1,81 @@
+# CI/CD Workflow for Deploying the Application to EKS.
+
+name: DeployCode
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on call from the source repo.
+  workflow_call:
+    inputs:
+      serviceName:
+        required: true
+        type: string
+      servicePort:
+        required: true
+        type: string
+      imageTag:
+        required: true
+        type: string
+      cluster:
+        required: true
+        type: string
+      aws_region:
+        required: true
+        type: string
+      deploymentRepo:
+        required: true
+        type: string
+      deploymentFile:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      env:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      PATTOKEN:
+        required: true
+
+env:
+  AWS_REGION: ${{ inputs.aws_region }}
+  EKS_CLUSTER: ${{ inputs.cluster }}
+
+jobs:
+  # This workflow contains a single job called "deploy"
+  deploy:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-20.04
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v3
+      with:
+        repository: ${{ inputs.deploymentRepo }}
+        ref: deployment-${{ inputs.env }}
+        token: ${{ secrets.PATTOKEN }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Change Image name and tag
+      run: |
+        sed -i s/imageTag/${{ inputs.imageTag }}/g ${{ inputs.deploymentFile }}
+        sed -i s/serviceName/${{ inputs.serviceName }}/g ${{ inputs.deploymentFile }}
+        sed -i s/servicePort/${{ inputs.servicePort }}/g ${{ inputs.deploymentFile }}
+        cat ${{ inputs.deploymentFile }}
+
+    - name: Deploy to EKS
+      run: |
+        aws eks --region ${{ env.AWS_REGION }} update-kubeconfig --name ${{ env.EKS_CLUSTER }}
+        kubectl apply -f ${{ inputs.deploymentFile }} -n ${{ inputs.namespace }}
+        kubectl get svc
