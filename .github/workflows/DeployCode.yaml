@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       id-token: write
-      contents: read
+      contents: write
       
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
